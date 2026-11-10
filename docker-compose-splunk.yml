@@ -1,0 +1,62 @@
+version: '3.5'
+
+# see https://www.cloudsavvyit.com/10765/how-to-simplify-docker-compose-files-with-yaml-anchors-and-extensions/
+
+x-log-drive: &log-drive
+    logging:
+      driver: splunk
+      options:
+        splunk-url: ${SPLUNK_URL}
+        splunk-verify-connection: "false"
+        splunk-token: ${SPLUNK_TOKEN}
+        splunk-index: ingenium
+        splunk-source: ${ING_INSTANCE}
+        splunk-sourcetype: docker-log
+        splunk-insecureskipverify: "true"
+        splunk-format: json
+        max-buffer-size: 10m
+        mode: "non-blocking"
+        tag: "${ING_INSTANCE}-{{.Name}}"
+
+services:
+  auth_service_mysql:
+    <<: *log-drive
+
+  auth_service_redis:
+    <<: *log-drive
+
+  auth_service:
+    <<: *log-drive
+
+  arangodb_archive:
+    <<: *log-drive
+
+  archive_ing:
+    <<: *log-drive
+
+  exec_redis:
+    <<: *log-drive
+
+  exec_server:
+    <<: *log-drive
+
+  execution_monitor:
+    <<: *log-drive
+
+  fileservering:
+    <<: *log-drive
+
+  core_server:
+    <<: *log-drive
+
+  arangodb_dict_service:
+    <<: *log-drive
+
+  dict_service:
+    <<: *log-drive
+
+  ui:
+    <<: *log-drive
+
+  ui_nginx:
+    <<: *log-drive

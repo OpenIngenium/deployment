@@ -1,0 +1,60 @@
+version: '3.5'
+
+# Build configuration for Ingenium services
+# Used by opensource_deployment3/build_images.py to build Docker images locally
+
+services:
+  archive_ing:
+    build:
+      context: ${REPOS_PATH}/archive
+      dockerfile: Dockerfile
+
+  auth_service:
+    build:
+      context: ${REPOS_PATH}/auth-service/auth_service
+      dockerfile: Dockerfile
+
+  core_server:
+    build:
+      context: ${REPOS_PATH}/core_server
+      dockerfile: Dockerfile
+
+  dict_service:
+    build:
+      context: ${REPOS_PATH}/dict_service
+      dockerfile: Dockerfile
+
+  execution_monitor:
+    build:
+      context: ${REPOS_PATH}/execution-monitor-service
+      dockerfile: Dockerfile
+
+  exec_server:
+    build:
+      context: ${REPOS_PATH}/execution_server
+      dockerfile: Dockerfile
+
+  ui:
+    build:
+      context: ${REPOS_PATH}/ui
+      dockerfile: Dockerfile
+
+  ui_nginx:
+    build:
+      context: ${REPOS_PATH}/ui
+      dockerfile: ${UI_NGINX_BUILD_DOCKERFILE}
+  
+  report_server:
+    build:
+      context: ${REPOS_PATH}/report_server
+      dockerfile: Dockerfile
+  
+  data_sync_service:
+    build:
+      context: ${REPOS_PATH}/data_sync_service
+      dockerfile: Dockerfile
+
+  search_server:
+    build:
+      context: ${REPOS_PATH}/search_server
+      dockerfile: Dockerfile

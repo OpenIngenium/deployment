@@ -1,0 +1,344 @@
+version: '3.5'
+
+services:
+  auth_service_mysql:
+    container_name: auth_service_mysql
+    image: ${AUTH_SERVICE_MYSQL_IMAGE}
+    environment:
+      - MYSQL_ROOT_PASSWORD=${AUTH_DB_MYSQL_ROOT_PASSWORD}
+# MYSQL_DATABASE env variable will cause the container to create auth DB if it does not exist.
+# Disabled this since this has been causing some race condition when auth service was seeding db.
+# Now the auth service creates auth DB if it does not exist.
+      - MYSQL_DATABASE=${AUTH_DB_MYSQL_DATABASE}
+    ports:
+      - 127.0.0.1:3306:3306
+    networks:
+      - ingenium
+    volumes:
+      - /data/auth/db:/var/lib/mysql
+      - /etc/localtime:/etc/localtime:ro
+    restart: always
+    labels:
+      io.ingenium.deployment: true    
+
+  auth_service_redis:
+    container_name: auth_service_redis
+    image: ${AUTH_SERVICE_REDIS_IMAGE}
+    ports:
+    # expose port for ui dev mode since auth_service_redis is used for Django session cache as well
+      - 127.0.0.1:${AUTH_REDIS_PORT_FROM}:${AUTH_REDIS_PORT_FROM}
+    networks:
+      - ingenium
+    restart: always
+    labels:
+      io.ingenium.deployment: true      
+
+  auth_service:
+    container_name: auth_service
+    image: ${AUTH_SERVICE_IMAGE}
+    environment:
+      - MYSQL_HOST=auth_service_mysql
+      - MYSQL_ROOT_PASSWORD=${AUTH_DB_MYSQL_ROOT_PASSWORD}
+      - MYSQL_DATABASE=${AUTH_DB_MYSQL_DATABASE}
+      - PUBLIC_PEM=${PUBLIC_PEM}
+      - PRIVATE_PEM=${PRIVATE_PEM}
+      - USERNAME=${TEST_USER}
+      - PASSWORD=${TEST_PASS}
+      - LONG_EXPIRE=${LONG_EXPIRE}
+      - AUTH_METHOD=${AUTH_METHOD}
+      - LDAP_URL=${LDAP_URL}
+      - RSA_URL=${RSA_URL}
+      - RSA_CLIENT_ID=${RSA_CLIENT_ID}
+      - RSA_CLIENT_KEY=${RSA_CLIENT_KEY}
+      - NODE_TLS_REJECT_UNAUTHORIZED=0 
+      - LDAP_BASE_DN=${LDAP_BASE_DN}
+      - LDAP_GROUP_OBJECTCLASS=${LDAP_GROUP_OBJECTCLASS}
+    depends_on:
+      - auth_service_mysql
+      - auth_service_redis
+    ports:
+      - 127.0.0.1:8007:8080
+    networks:
+      - ingenium
+    volumes:
+      - /data/auth/backup:/data
+      - /etc/localtime:/etc/localtime:ro
+    extra_hosts:
+      - ${LDAP_HOST}:${LDAP_IP}
+    restart: always
+    labels:
+      io.ingenium.deployment: true      
+
+  arangodb_archive:
+    container_name: arangodb_archive
+    image: ${ARANGODB_ARCHIVE_IMAGE}
+    environment:
+      - ARANGO_ROOT_PASSWORD=${ARANGO_ROOT_PASSWORD}
+      - ARANGO_STORAGE_ENGINE=rocksdb
+    ports:
+      - 127.0.0.1:8529:8529
+    networks:
+      - ingenium
+    volumes:
+      - /data/arangodb:/var/lib/arangodb3
+      - /etc/localtime:/etc/localtime:ro
+    extra_hosts:
+      - ${ING_ANALYTICS_HOST}:${ING_ANALYTICS_IP}
+    restart: always
+    labels:
+      io.ingenium.deployment: true      
+
+  archive_ing:
+    container_name: archive_ing
+    image: ${ARCHIVE_ING_IMAGE}
+    environment:
+      - ARANGODBURL=http://arangodb_archive:8529
+      - ARANGO_ROOT_PASSWORD=${ARANGO_ROOT_PASSWORD}
+      - PROCEDURE_ID_PREFIX=${PROCEDURE_ID_PREFIX}
+      - EXECUTION_ID_PREFIX=${EXECUTION_ID_PREFIX}
+      - PUBLIC_PEM=${PUBLIC_PEM}
+      - ARCHIVE_ING_IMAGE=${ARCHIVE_ING_IMAGE}
+    depends_on:
+      - arangodb_archive
+    ports:
+      - 127.0.0.1:8010:8010
+    networks:
+      - ingenium
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+    restart: always
+    labels:
+      io.ingenium.deployment: True     
+
+  exec_redis:
+    container_name: exec_redis
+    image: ${EXEC_REDIS_IMAGE}
+    # ports:
+    # No need to expose port
+    #  - 127.0.0.1:6379:6379
+    networks:
+      - ingenium
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+    restart: always
+    labels:
+      io.ingenium.deployment: true      
+
+  exec_server:
+    container_name: exec_server
+    image: ${EXEC_SERVER_IMAGE}
+    environment:
+      - GATEWAY_URL=http://localhost:8888
+      - GATEWAY_WS_URL=ws://localhost:8888
+      - NUMBER_OF_KERNELS_MIN=${NUMBER_OF_KERNELS_MIN}
+      - REDIS_HOST=exec_redis
+      - REDIS_PORT=6379
+      - PRIVATE_PEM=${PRIVATE_PEM}      
+      - PUBLIC_PEM=${PUBLIC_PEM}
+      - EXEC_VENUE_PRIVATE_PEM=${EXEC_VENUE_PRIVATE_PEM}
+      - EXEC_VENUE_PUBLIC_PEM=${EXEC_VENUE_PUBLIC_PEM}
+      - EXECUTION_CACHE_TYPE=REDIS      
+      - LOG_LEVEL=INFO
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - FILE_SERVER_API_HOST=http://fileservering:9000
+      - MEDIA_BUCKET=${MEDIA_BUCKET}
+      - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION}
+      - VERIFY_FSW_CHANNELS=${VERIFY_FSW_CHANNELS}
+      - VERIFY_FSW_EVR=${VERIFY_FSW_EVR}
+      - VERIFY_HW_CHANNELS=${VERIFY_HW_CHANNELS}
+      - VERIFY_HW_EVR=${VERIFY_HW_EVR}
+      - VERIFY_FILE_CHANNELS=${VERIFY_FILE_CHANNELS}
+      - VERIFY_FILE_EVR=${VERIFY_FILE_EVR}
+      - VERIFY_EVR_MSG=${VERIFY_EVR_MSG}
+    depends_on:
+      - exec_redis
+    ports:
+      - 127.0.0.1:9999:9999
+    networks:
+      - ingenium
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+    extra_hosts:
+      - ${VENUE_HOST_1}:${VENUE_IP_1}
+      - ${VENUE_HOST_2}:${VENUE_IP_2}
+    restart: always
+    labels:
+      io.ingenium.deployment: true      
+
+  execution_monitor:
+    container_name: execution_monitor
+    image: ${EXECUTION_MONITOR_IMAGE}
+    environment:
+      - PUBLIC_PEM=${PUBLIC_PEM}
+      - EMS_SECRET=${EMS_SECRET}    
+    ports:
+      - 127.0.0.1:3000:3000
+    networks:
+      - ingenium
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+    restart: always
+    labels:
+      io.ingenium.deployment: true      
+
+  fileservering:
+    container_name: fileservering
+    image: ${FILESERVERING_IMAGE}
+    entrypoint: sh
+    command: -c '/usr/bin/minio server /data/file_server'
+    environment:
+      - MINIO_ACCESS_KEY=${AWS_ACCESS_KEY_ID}
+      - MINIO_SECRET_KEY=${AWS_SECRET_ACCESS_KEY}  
+    ports:
+      - "127.0.0.1:9000:9000"
+    networks:
+      - ingenium
+    volumes:
+      - /data/file_server:/data/file_server
+      - /etc/localtime:/etc/localtime:ro
+    restart: always
+    labels:
+      io.ingenium.deployment: true      
+
+  core_server:
+    container_name: core_server
+    image: ${CORE_SERVER_IMAGE}
+    environment:
+      - ARCHIVE=http://archive_ing:8010/api/v5
+      - EXECUTION=http://exec_server:9999/api/v4
+      - DICTIONARY=http://dict_service:5000/api/v4
+      - FILE_SERVER_API_HOST=http://fileservering:9000
+      - FILE_SERVER_ACCESS_KEY=${AWS_ACCESS_KEY_ID}
+      - FILE_SERVER_SECRET_KEY=${AWS_SECRET_ACCESS_KEY}
+      - MEDIA_BUCKET=${MEDIA_BUCKET}
+      - EXECUTION_MONITOR_URL=http://execution_monitor:3000/api/v2/execution_event_publish
+      - EMS_SECRET=${EMS_SECRET}
+      - PUBLIC_PEM=${PUBLIC_PEM}
+      - SERVER_TIMEOUT_SEC=290
+    depends_on:
+      - archive_ing
+      - exec_server
+      - execution_monitor
+      - fileservering
+    ports:
+      - 127.0.0.1:8002:8080
+    networks:
+      - ingenium
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+    restart: always
+    labels:
+      io.ingenium.deployment: true     
+  
+
+  arangodb_dict_service:
+    container_name: arangodb_dict_service
+    image: ${ARANGODB_ARCHIVE_IMAGE}
+    environment:
+      - ARANGO_ROOT_PASSWORD=${ARANGO_ROOT_PASSWORD}
+      - ARANGO_STORAGE_ENGINE=rocksdb
+    ports:
+      - 127.0.0.1:8530:8529
+    networks:
+      - ingenium
+    volumes:
+      - /data/arangodb_dict_service:/var/lib/arangodb3
+      - /etc/localtime:/etc/localtime:ro
+    restart: always
+    labels:
+      io.ingenium.deployment: true      
+
+  dict_service:
+    container_name: dict_service
+    image: ${DICT_SERVICE_IMAGE}
+    environment:
+      - ARANGO_URL=http://arangodb_dict_service:8529
+      - ARANGO_USERNAME=root
+      - ARANGO_PASSWORD=${ARANGO_ROOT_PASSWORD}
+      - ARANGO_DB_NAME=project_config
+      - APP_HOST=0.0.0.0
+      - APP_PORT=5000
+      - PUBLIC_PEM=${PUBLIC_PEM}
+    depends_on:
+      - arangodb_dict_service
+    networks:
+      - ingenium
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+    restart: always
+    labels:
+      io.ingenium.deployment: true           
+
+  ui:
+    container_name: ui
+    image: ${UI_IMAGE}
+    environment:
+      - CORE_API_URL=http://core_server:8080/api/v5/
+      - ARCHIVE_API_URL=http://archive_ing:8010/api/v5/
+      - DICT_API_URL=http://dict_service:5000/api/v4/
+      - AUTH_API_URL=http://auth_service:8080/api/v2/
+      - AUTH_METHOD=${AUTH_METHOD}
+      - EXECUTION_SERVER_URL=http://exec_server:9999/api/v4
+      - PUBLIC_PEM=${PUBLIC_PEM}
+      - UI_ENABLE_DEBUG_INFORMATION=True    # TODO: Do we need this?
+      - SERVER_ENVIRONMENT=prod
+      - APPLICATION_TITLE=${APPLICATION_TITLE}
+      - APPLICATION_ACRONYM=${APPLICATION_ACRONYM}
+      - UI_CUSTOM_FOOTER=${UI_CUSTOM_FOOTER}
+      - FROALA_KEY=${FROALA_KEY}
+      - CSRF_SECRET=${CSRF_SECRET}
+      - CMD_STRING_FORMAT=${CMD_STRING_FORMAT}
+    depends_on:
+      - core_server
+      - auth_service
+      - dict_service
+    ports:
+      - 127.0.0.1:4999:5000
+    networks:
+      - ingenium
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+    restart: always
+    labels:
+      io.ingenium.deployment: true      
+
+  ui_nginx:
+    container_name: ui_nginx
+    image: ${UI_NGINX_IMAGE}
+    environment:
+      - CORE_API_HOST=core_server:8080
+      - ARCHIVE_API_HOST=archive_ing:8010
+      - FILE_SERVER_API_HOST=fileservering:9000
+      - DICT_API_HOST=dict_service:5000
+      - EXECUTION_MONITOR_API_HOST=execution_monitor:3000
+      - AUTH_API_HOST=auth_service:8080
+      - EXECUTION_SERVER_HOST=exec_server:9999
+      - DJANGO_HOST
+      - SEARCH_API_URL=${SEARCH_API_URL}
+      - REPORT_API_URL=${REPORT_API_URL}
+      - ING_ANALYTICS_IP=${ING_ANALYTICS_IP}
+    ports:
+      - "443:443"
+    networks:
+      - ingenium
+    volumes:
+      - ${NGINX_SSL_DIR}:/etc/nginx/ssl
+      - /etc/localtime:/etc/localtime:ro
+    extra_hosts:
+      - ${ING_ANALYTICS_HOST}:${ING_ANALYTICS_IP}
+    depends_on:
+      - ui
+      - core_server
+      - auth_service
+      - dict_service
+    restart: always
+    labels:
+      io.ingenium.deployment: true
+
+networks:
+  ingenium:
+    driver: bridge
+    name: ingenium
+    driver_opts:
+      com.docker.network.driver.mtu: ${MTU}

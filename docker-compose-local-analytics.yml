@@ -1,0 +1,25 @@
+version: '3.5'
+
+# see https://www.cloudsavvyit.com/10765/how-to-simplify-docker-compose-files-with-yaml-anchors-and-extensions/
+
+x-log-drive: &log-drive
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "2"
+
+services:
+  arangodb_archive_replica:
+    <<: *log-drive
+
+  elasticsearch_analytics:
+    <<: *log-drive
+
+  search_server:
+    <<: *log-drive
+
+  data_sync_service:
+    <<: *log-drive
+    
+  report_server:
+    <<: *log-drive

@@ -1,0 +1,166 @@
+version: '3.5'
+
+services:
+  report_service_redis:
+    container_name: report_service_redis
+    image: ${REPORT_SERVICE_REDIS_IMAGE}
+    ports:
+      - 127.0.0.1:${REPORT_REDIS_PORT_FROM}:${REPORT_REDIS_PORT_FROM}
+    networks:
+      - ingenium
+    restart: always
+    labels:
+      io.ingenium.deployment: true    
+
+  arangodb_archive_replica:
+    container_name: arangodb_archive_replica
+    image: ${ARANGODB_ARCHIVE_IMAGE}
+    environment:
+      - ARANGO_ROOT_PASSWORD=${ARANGO_ROOT_PASSWORD}
+      - ARANGO_STORAGE_ENGINE=rocksdb
+    ports:
+      - 127.0.0.1:8529:8529
+    networks:
+      - ingenium
+    volumes:
+      - /data/arangodb:/var/lib/arangodb3
+      - /etc/localtime:/etc/localtime:ro
+    extra_hosts:
+      - ${ING_HOST}:${ING_IP}
+    restart: always
+    labels:
+      io.ingenium.deployment: true      
+
+  elasticsearch_analytics:
+    container_name: elasticsearch_analytics
+    image: ${ELASTICSEARCH_ANALYTICS_IMAGE}
+    ports:
+      - 127.0.0.1:9200:9200
+      - 127.0.0.1:9300:9300
+    environment:
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms5g -Xmx10g"
+      - xpack.security.enabled=false
+    networks:
+      - ingenium
+    volumes:
+      - /data/elasticsearch/data:/usr/share/elasticsearch/data
+      - /etc/localtime:/etc/localtime:ro
+    restart: always
+    labels:
+      io.ingenium.deployment: true
+
+  search_server:
+    container_name: search_server
+    image: ${SEARCH_SERVER_IMAGE}
+    environment:
+      - ELASTIC_SEARCH_HOST=http://elasticsearch_analytics:9200
+      - PUBLIC_PEM=${PUBLIC_PEM}
+    depends_on:
+      - elasticsearch_analytics
+    ports:
+      - 127.0.0.1:3025:3025
+    networks:
+      - ingenium
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+    restart: always
+    labels:
+      io.ingenium.deployment: true   
+
+  report_server:
+    container_name: report_server
+    image: ${REPORT_SERVER_IMAGE}
+    environment:    
+      - PUBLIC_PEM=${PUBLIC_PEM}    
+      - LOG_LEVEL=DEBUG
+      - SEARCH_API_URL=${SEARCH_API_URL}/api/v1/
+      - FILE_SERVER_API_HOST=${FILE_SERVER_API_URL}
+      - CORE_API_URL=${CORE_API_URL}/api/v5/
+      - ING_SERVER=${ING_SERVER}
+      - FILE_SERVER_ACCESS_KEY=${AWS_ACCESS_KEY_ID}
+      - FILE_SERVER_SECRET_KEY=${AWS_SECRET_ACCESS_KEY}
+      - MEDIA_BUCKET=${MEDIA_BUCKET}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_HOST_PORT=${SMTP_HOST_PORT}
+      - REDIS_HOST=report_service_redis
+      - REDIS_PORT=${REPORT_REDIS_PORT_FROM}
+      - NODE_TLS_REJECT_UNAUTHORIZED=0
+      - PDF_CUSTOM_HEADER=${PDF_CUSTOM_HEADER}
+      - PDF_CUSTOM_FOOTER=${PDF_CUSTOM_FOOTER}
+      - NUM_WORKERS=${NUM_WORKERS}
+      - EMAIL_DOMAIN=${EMAIL_DOMAIN}
+      - PDF_PROCEDURE_NOTE=${PDF_PROCEDURE_NOTE}
+      - PDF_EXECUTION_NOTE=${PDF_EXECUTION_NOTE}
+      - PDF_CLEANUP_ENABLED=${PDF_CLEANUP_ENABLED}
+      - PDF_RETENTION_DAYS=${PDF_RETENTION_DAYS}
+    depends_on:
+      - report_service_redis
+      - elasticsearch_analytics
+      - search_server
+    ports:
+      - 127.0.0.1:3003:3003
+    networks:
+      - ingenium
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+    extra_hosts:
+      - ${ING_HOST}:${ING_IP}
+      - ${SMTP_HOST}:${SMTP_IP}
+    restart: always
+    labels:
+      io.ingenium.deployment: true   
+      
+  data_sync_service:
+    container_name: data_sync_service
+    image: ${DATA_SYNC_SERVICE_IMAGE}
+    environment:
+      - ARANGO_URL=http://arangodb_archive_replica:8529
+      - ARANGO_USER=root
+      - ARANGO_ROOT_PASSWORD=${ARANGO_ROOT_PASSWORD}
+      - ARANGO_DB_NAME=ingenium
+      - ES_HOST=elasticsearch_analytics
+      - ES_PORT=9200
+    depends_on:
+      - arangodb_archive_replica
+      - elasticsearch_analytics
+      - search_server
+      - report_server
+    networks:
+      - ingenium
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+    extra_hosts:
+      - ${ING_HOST}:${ING_IP}
+    restart: always
+    labels:
+      io.ingenium.deployment: true
+
+  analytics_nginx:
+    container_name: analytics_nginx
+    image: nginx:1.20.1-alpine
+    depends_on:
+      - arangodb_archive_replica
+      - elasticsearch_analytics
+      - report_server
+      - search_server
+      - data_sync_service
+    ports:
+      - "443:443"
+    networks:
+      - ingenium
+    volumes:
+      - ${NGINX_CONF_DIR}:/etc/nginx/conf.d
+      - ${NGINX_SSL_DIR}:/etc/nginx/ssl
+      - /etc/localtime:/etc/localtime:ro
+    restart: always
+    labels:
+      io.ingenium.deployment: true
+
+networks:
+  ingenium:
+    driver: bridge
+    name: ingenium
+    driver_opts:
+      com.docker.network.driver.mtu: ${MTU}
