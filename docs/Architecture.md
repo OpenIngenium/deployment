@@ -193,7 +193,7 @@ the overlay automatically.
 Images are tagged using one of three patterns (see `build_images.py`):
 
 - **Release tag**: `--tag r14_3_1` → `ingenium/<service>:r14_3_1`
-- **Branch build**: `--branch devel` → `ingenium/<service>:devel-<short-hash>`
+- **Branch build**: `--branch main` → `ingenium/<service>:main-<short-hash>`
   (commit hash appended automatically so every build is traceable)
 - **Namespaced build**: `--namespace hotfix --tag r14_3_1` →
   `ingenium/<service>:hotfix-r14_3_1` (useful for parallel test builds)

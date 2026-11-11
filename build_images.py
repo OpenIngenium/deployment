@@ -411,10 +411,10 @@ Examples:
   %(prog)s --repo all --tag r14_3_1
   
   # Build single repository with branch-hash pattern
-  %(prog)s --repo ui --branch devel
+  %(prog)s --repo ui --branch main
   
   # Build using cache (faster, but not recommended for releases)
-  %(prog)s --repo ui --branch devel --use-cache
+  %(prog)s --repo ui --branch main --use-cache
   
   # Build with custom repos path
   %(prog)s --repo core_server --tag r14_3_1 --repos-path /path/to/repos
