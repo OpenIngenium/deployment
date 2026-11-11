@@ -516,8 +516,8 @@ def select_ref(repos_path: Optional[Path] = None, repos: Optional[List[str]] = N
         default_branch = questionary.select(
             "Which default branch?",
             choices=[
-                questionary.Choice("devel (default)", value="devel"),
-                questionary.Choice("main", value="main"),
+                questionary.Choice("main (default)", value="main"),
+                questionary.Choice("devel", value="devel"),
                 questionary.Choice("master", value="master"),
                 questionary.Separator(),
                 questionary.Choice("⬅️  Back", value="back"),

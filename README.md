@@ -72,7 +72,7 @@ cd /path/to/ingenium-dep/opensource_deployment3
 ./clone_repos.py --repo all --tag r14_3_1
 
 # Clone single repository
-./clone_repos.py --repo ui --branch devel
+./clone_repos.py --repo ui --branch main
 
 # Clone to custom location
 ./clone_repos.py --repo all --tag r14_3_1 --repos-path /path/to/repos
@@ -101,7 +101,7 @@ cd /path/to/ingenium-dep/opensource_deployment3
 **Build single service:**
 ```bash
 ./build_images.py --repo ui --tag r14_3_1
-./build_images.py --repo core_server --branch devel
+./build_images.py --repo core_server --branch main
 ```
 
 **Build with custom options:**
@@ -819,9 +819,9 @@ Images are tagged using the following patterns:
 
 ### With Branch (auto-includes commit hash)
 ```bash
-./build_images.py --repo ui --branch devel
-# Creates: ingenium/ui:devel-abc1234
-#          ingenium/ui_nginx:devel-abc1234
+./build_images.py --repo ui --branch main
+# Creates: ingenium/ui:main-abc1234
+#          ingenium/ui_nginx:main-abc1234
 ```
 
 ### With Namespace
@@ -856,11 +856,11 @@ docker images | grep ingenium
 
 ### Development Workflow
 ```bash
-# 1. Clone repos on devel branch
-./clone_repos.py --repo all --branch devel
+# 1. Clone repos on main branch
+./clone_repos.py --repo all --branch main
 
 # 2. Build images (will include commit hash)
-./build_images.py --repo all --branch devel
+./build_images.py --repo all --branch main
 
 # 3. Make changes to a specific repo
 cd git_repos/ui
@@ -869,7 +869,7 @@ git commit -am "My changes"
 
 # 4. Rebuild just that service
 cd ../..
-./build_images.py --repo ui --branch devel
+./build_images.py --repo ui --branch main
 ```
 
 ### Single Service Update
@@ -920,7 +920,7 @@ opensource_deployment3/
 - Python 3.6+ (compatible with the older Python versions found on deployment VMs)
 - Docker and Docker Compose
 - Git
-- HTTPS access to github.com/your-org (username + personal access token)
+- HTTPS access to github.com/OpenIngenium (the open-source repositories)
 
 ## Troubleshooting
 
