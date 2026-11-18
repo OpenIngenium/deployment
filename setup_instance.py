@@ -233,19 +233,19 @@ def load_instance_config(instance_path: Path) -> Dict[str, str]:
         'SMTP_IP': r'export SMTP_IP=(\S+)',
         'SPLUNK_URL': r'export SPLUNK_URL=(\S+)',
         'RTAG': r'export RTAG=(\S+)',
-        'APPLICATION_TITLE': r'export APPLICATION_TITLE="([^"]+)"',
-        'APPLICATION_ACRONYM': r'export APPLICATION_ACRONYM="([^"]+)"',
-        'PROCEDURE_ID_PREFIX': r'export PROCEDURE_ID_PREFIX="([^"]+)"',
-        'EXECUTION_ID_PREFIX': r'export EXECUTION_ID_PREFIX="([^"]+)"',
-        'AWS_DEFAULT_REGION': r'export AWS_DEFAULT_REGION="([^"]+)"',
+        'APPLICATION_TITLE': r'export APPLICATION_TITLE="((?:[^"\\]|\\.)+)"',
+        'APPLICATION_ACRONYM': r'export APPLICATION_ACRONYM="((?:[^"\\]|\\.)+)"',
+        'PROCEDURE_ID_PREFIX': r'export PROCEDURE_ID_PREFIX="((?:[^"\\]|\\.)+)"',
+        'EXECUTION_ID_PREFIX': r'export EXECUTION_ID_PREFIX="((?:[^"\\]|\\.)+)"',
+        'AWS_DEFAULT_REGION': r'export AWS_DEFAULT_REGION="((?:[^"\\]|\\.)+)"',
         'MEDIA_BUCKET': r'export MEDIA_BUCKET=(\S+)',
-        'FROALA_KEY': r'export FROALA_KEY="([^"]*)"',
-        'CMD_STRING_FORMAT': r'export CMD_STRING_FORMAT="([^"]*)"',
-        'PDF_CUSTOM_HEADER': r'export PDF_CUSTOM_HEADER="([^"]*)"',
-        'PDF_CUSTOM_FOOTER': r'export PDF_CUSTOM_FOOTER="([^"]*)"',
-        'UI_CUSTOM_FOOTER': r'export UI_CUSTOM_FOOTER="([^"]*)"',
-        'PDF_PROCEDURE_NOTE': r'export PDF_PROCEDURE_NOTE="([^"]*)"',
-        'PDF_EXECUTION_NOTE': r'export PDF_EXECUTION_NOTE="([^"]*)"',
+        'FROALA_KEY': r'export FROALA_KEY="((?:[^"\\]|\\.)*)"',
+        'CMD_STRING_FORMAT': r'export CMD_STRING_FORMAT="((?:[^"\\]|\\.)*)"',
+        'PDF_CUSTOM_HEADER': r'export PDF_CUSTOM_HEADER="((?:[^"\\]|\\.)*)"',
+        'PDF_CUSTOM_FOOTER': r'export PDF_CUSTOM_FOOTER="((?:[^"\\]|\\.)*)"',
+        'UI_CUSTOM_FOOTER': r'export UI_CUSTOM_FOOTER="((?:[^"\\]|\\.)*)"',
+        'PDF_PROCEDURE_NOTE': r'export PDF_PROCEDURE_NOTE="((?:[^"\\]|\\.)*)"',
+        'PDF_EXECUTION_NOTE': r'export PDF_EXECUTION_NOTE="((?:[^"\\]|\\.)*)"',
         'PDF_CLEANUP_ENABLED': r'export PDF_CLEANUP_ENABLED="?(\w+)"?',
         'PDF_RETENTION_DAYS': r'export PDF_RETENTION_DAYS="?(\w+)"?',
     }
@@ -635,6 +635,10 @@ def prompt_for_config(mode: str, existing_config: Optional[Dict[str, str]] = Non
             "PDF Execution Note (HTML/CSS, press Enter for default):",
             default=config_values.get('PDF_EXECUTION_NOTE', 'NOTE: Paper copy of this AS RUN may not be current and should not be relied on for official information. The current version is available in the Ingenium web application.')
         ).ask()
+        
+        # Escape any unescaped double quotes so the value stays valid inside export VAR="..."
+        for key in ('PDF_CUSTOM_HEADER', 'PDF_CUSTOM_FOOTER', 'UI_CUSTOM_FOOTER', 'PDF_PROCEDURE_NOTE', 'PDF_EXECUTION_NOTE'):
+            config_values[key] = re.sub(r'(?<!\\)"', r'\\"', config_values[key] or '')
     else:
         config_values['PDF_CUSTOM_HEADER'] = config_values.get('PDF_CUSTOM_HEADER', '')
         config_values['PDF_CUSTOM_FOOTER'] = config_values.get('PDF_CUSTOM_FOOTER', '')
