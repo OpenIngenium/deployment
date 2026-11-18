@@ -18,7 +18,9 @@ except ImportError:
 import config
 import subprocess
 import os
+import re
 from typing import Dict, List, Optional, Tuple
+from build_images import REPO_SERVICE_MAPPING, build_image_tag
 
 
 # Custom style for the wizard
@@ -741,6 +743,22 @@ def build_workflow():
         image_tag = None
         branch = None  # Will use commit hash
     
+    # For branch builds, update the built service image vars in an instance's ing_envs.sh
+    target_instance = None
+    if ref_type == "branch":
+        instances = get_instances()
+        if instances:
+            target_instance = questionary.select(
+                "Update image variables in which instance's ing_envs.sh?",
+                choices=sorted(instances) + [questionary.Separator(), questionary.Choice("Skip", value="skip")],
+                style=custom_style
+            ).ask()
+            if target_instance is None:
+                print("❌ Operation cancelled")
+                return
+            if target_instance == "skip":
+                target_instance = None
+    
     # Additional options
     # Note: Default is to clear cache for clean builds
     no_cache = questionary.confirm(
@@ -870,12 +888,31 @@ def build_workflow():
         
         if success:
             success_count += 1
+            if target_instance:
+                env_file = Path.cwd() / target_instance / "ing_envs.sh"
+                built_repos = REPO_SERVICE_MAPPING.keys() if repo == "all" else [repo]
+                for built_repo in built_repos:
+                    tag = build_image_tag(built_repo, repos_path, branch=branch)
+                    for service in REPO_SERVICE_MAPPING[built_repo]:
+                        update_service_image(env_file, service, f"ingenium/{service}:{tag}")
     
     # Summary
     if success_count == len(repos_to_build):
         header(f"🎉 SUCCESS: All {success_count} builds completed!", "success")
     else:
         header(f"⚠️  PARTIAL: {success_count}/{len(repos_to_build)} builds completed", "warn")
+
+
+def update_service_image(env_file: Path, service: str, image: str) -> None:
+    """Replace the `export <SERVICE>_IMAGE=...` line in an instance's ing_envs.sh."""
+    var = f"{service.upper()}_IMAGE"
+    content = env_file.read_text()
+    content, count = re.subn(rf"^export {var}=.*$", f"export {var}={image}", content, flags=re.M)
+    if count:
+        env_file.write_text(content)
+        print(f"  ✓ {env_file.parent.name}/ing_envs.sh: {var}={image}")
+    else:
+        print(f"  ⚠️  {var} not found in {env_file}")
 
 
 def get_instances():
